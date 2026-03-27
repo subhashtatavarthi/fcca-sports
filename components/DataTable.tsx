@@ -53,7 +53,11 @@ export default function DataTable({ columns, rows }: DataTableProps) {
 
   return (
     <div className="table-card">
-      <h3>🏏 Players Participated — {rows.length} Players</h3>
+      <div className="table-header-row">
+        <h3>🏏 Players Participated — {rows.length} Players</h3>
+        <span className="table-legend"><strong>DNA</strong> = Did Not Attempt</span>
+      </div>
+
       <div className="table-wrap">
         <table>
           <thead>

@@ -182,8 +182,15 @@ thead th {
   color: white; padding: 10px 14px; text-align: left;
   font-weight: 600; white-space: nowrap;
 }
+.sortable-th { cursor: pointer; user-select: none; }
+.sortable-th:hover { background: linear-gradient(90deg, #38bdf8, #0284c7); }
+.th-inner { display: inline-flex; align-items: center; gap: 6px; }
+.sort-icon { font-size: 0.75rem; }
+.sort-neutral { opacity: 0.4; }
+.sort-active  { opacity: 1; font-weight: 900; }
 thead th:first-child { border-radius: 10px 0 0 0; }
 thead th:last-child  { border-radius: 0 10px 0 0; }
+
 tbody tr { transition: background 0.15s; }
 tbody tr:nth-child(even) { background: rgba(14,165,233,0.06); }
 tbody tr:hover { background: rgba(14,165,233,0.14); }

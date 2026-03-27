@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface DataTableProps {
   columns: string[];
@@ -8,10 +8,48 @@ interface DataTableProps {
 
 const PAGE_SIZE = 10;
 
+type SortDir = 'asc' | 'desc';
+
+function compareValues(a: any, b: any, dir: SortDir) {
+  const av = a === null || a === undefined ? '' : a;
+  const bv = b === null || b === undefined ? '' : b;
+  const an = parseFloat(av), bn = parseFloat(bv);
+  let result = 0;
+  if (!isNaN(an) && !isNaN(bn)) {
+    result = an - bn;
+  } else {
+    result = String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' });
+  }
+  return dir === 'asc' ? result : -result;
+}
+
 export default function DataTable({ columns, rows }: DataTableProps) {
   const [page, setPage] = useState(0);
-  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
-  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const sortedRows = useMemo(() => {
+    if (!sortCol) return rows;
+    return [...rows].sort((a, b) => compareValues(a[sortCol], b[sortCol], sortDir));
+  }, [rows, sortCol, sortDir]);
+
+  const totalPages = Math.ceil(sortedRows.length / PAGE_SIZE);
+  const pageRows = sortedRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+    setPage(0); // reset to first page when sort changes
+  };
+
+  const sortIcon = (col: string) => {
+    if (sortCol !== col) return <span className="sort-icon sort-neutral">⇅</span>;
+    return <span className="sort-icon sort-active">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   return (
     <div className="table-card">
@@ -20,7 +58,14 @@ export default function DataTable({ columns, rows }: DataTableProps) {
         <table>
           <thead>
             <tr>
-              {columns.map(col => <th key={col}>{col}</th>)}
+              {columns.map(col => (
+                <th key={col} className="sortable-th" onClick={() => handleSort(col)}>
+                  <span className="th-inner">
+                    {col}
+                    {sortIcon(col)}
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>

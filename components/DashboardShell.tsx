@@ -123,34 +123,37 @@ export default function DashboardShell() {
   const [source, setSource] = useState<'public' | 'local' | 'new' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── On mount: try public file first, then localStorage ──
+  // ── On mount: localStorage first (user's upload wins), then public file ──
   useEffect(() => {
     async function autoLoad() {
-      // 1. Try the committed public data file
+      // 1. Use localStorage if the user has previously uploaded a file
+      //    This always takes priority so their latest upload is never overwritten
+      const saved = loadFromLocalStorage();
+      if (saved) {
+        setParsed(saved);
+        setSource('local');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fall back to the committed public data file (shared default for new visitors)
       try {
         setLoadingMsg('Loading shared dashboard data…');
         const res = await fetch(PUBLIC_DATA_URL, { cache: 'no-store' });
         if (res.ok) {
           const buf = await res.arrayBuffer();
           const p = parseArrayBuffer(buf, 'FCCA Shared Data');
-          p.uploadedAt = undefined; // don't show time for committed file
+          p.uploadedAt = undefined;
           setParsed(p);
           setSource('public');
-          setLoading(false);
-          return;
         }
       } catch {}
 
-      // 2. Fall back to localStorage
-      const saved = loadFromLocalStorage();
-      if (saved) {
-        setParsed(saved);
-        setSource('local');
-      }
       setLoading(false);
     }
     autoLoad();
   }, []);
+
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || !files[0]) return;

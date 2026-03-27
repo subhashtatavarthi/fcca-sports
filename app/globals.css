@@ -165,5 +165,66 @@ tbody td { padding: 9px 14px; border-bottom: 1px solid rgba(14,165,233,0.1); col
 @media (max-width: 640px) {
   .charts-grid { grid-template-columns: 1fr; }
   .kpi-grid    { grid-template-columns: repeat(2, 1fr); }
-  .header h1   { font-size: 1.4rem; }
+  .brand-bar   { flex-direction: column; text-align: center; }
+  .fcca-svg, .yash-img { height: 50px; }
+}
+
+/* ── Facebook Footer ── */
+.fb-footer {
+  margin-top: 36px;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 4px 20px rgba(3,105,161,0.12);
+  padding: 20px 24px;
+}
+.fb-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.fb-left  { flex: 0 0 auto; }
+.fb-right { flex: 0 0 auto; }
+.fb-center {
+  flex: 1 1 auto;
+  text-align: center;
+}
+.fb-label {
+  font-size: 1rem; font-weight: 700; color: #0c4a6e; margin-bottom: 4px;
+}
+.fb-tagline {
+  font-size: 0.82rem; color: #0369a1; margin-bottom: 14px;
+}
+.fb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #1877F2;
+  color: white;
+  padding: 11px 28px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(24,119,242,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.01em;
+}
+.fb-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(24,119,242,0.55);
+}
+.fb-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  background: white;
+  color: #1877F2;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }

@@ -42,21 +42,15 @@ function parseFile(file: File): Promise<ParsedData> {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
         if (!rows.length) { reject(new Error('No data found in file')); return; }
-
         const columns = Object.keys(rows[0]);
         const numericCols = columns.filter(col =>
           rows.slice(0, 20).filter(r => r[col] !== null && r[col] !== '').some(r => !isNaN(parseFloat(r[col])))
         );
-        // Pick a good label column (text, likely name/player/participant)
         const textCol = columns.find(c =>
-          !numericCols.includes(c) &&
-          rows.filter(r => r[c]).length > rows.length * 0.5
+          !numericCols.includes(c) && rows.filter(r => r[c]).length > rows.length * 0.5
         ) ?? columns[0];
-
         resolve({ columns, rows, numericCols, labelCol: textCol, fileName: file.name });
-      } catch (err) {
-        reject(err);
-      }
+      } catch (err) { reject(err); }
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
@@ -67,23 +61,52 @@ function buildKpis(parsed: ParsedData) {
   const { rows, numericCols, fileName } = parsed;
   const kpis: { label: string; value: string; sub?: string; icon?: string }[] = [];
 
-  kpis.push({ label: 'Total Records', value: String(rows.length), sub: fileName, icon: '👥' });
+  // Total records — file name as sub (no n=, as it IS n)
+  kpis.push({
+    label: 'Total Players',
+    value: String(rows.length),
+    sub: fileName,
+    icon: '👥'
+  });
 
   numericCols.slice(0, 7).forEach(col => {
     const vals = rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
     if (!vals.length) return;
-    const sum = vals.reduce((a, b) => a + b, 0);
-    const avg = sum / vals.length;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
     const max = Math.max(...vals);
+    const min = Math.min(...vals);
     kpis.push({
       label: col.length > 20 ? col.slice(0, 20) + '…' : col,
       value: fmt(avg),
-      sub: `Max: ${fmt(max)}  •  n=${vals.length}`,
+      sub: `Max: ${fmt(max)}  •  Min: ${fmt(min)}  •  n=${vals.length}`,
       icon: iconFor(col),
     });
   });
 
   return kpis;
+}
+
+// ── FCCA SVG Logo ──────────────────────────────────────
+function FCCALogo() {
+  return (
+    <svg viewBox="0 0 320 110" xmlns="http://www.w3.org/2000/svg" className="fcca-svg">
+      <rect width="320" height="110" rx="10" fill="#0a1172"/>
+      {/* Stumps */}
+      <line x1="22" y1="24" x2="22" y2="82" stroke="#FFD700" strokeWidth="3.5"/>
+      <line x1="32" y1="22" x2="32" y2="82" stroke="#FFD700" strokeWidth="3.5"/>
+      <line x1="42" y1="24" x2="42" y2="82" stroke="#FFD700" strokeWidth="3.5"/>
+      <line x1="19" y1="22" x2="45" y2="22" stroke="#FFD700" strokeWidth="2.8"/>
+      {/* Bat */}
+      <rect x="44" y="36" width="12" height="44" rx="4" fill="#FFD700" transform="rotate(-32 44 36)"/>
+      <rect x="34" y="72" width="14" height="9" rx="3" fill="#FFD700" transform="rotate(-32 34 72)"/>
+      {/* Ball */}
+      <circle cx="64" cy="76" r="5" fill="#FFD700"/>
+      {/* FCCA */}
+      <text x="82" y="68" fontFamily="Arial Black, Arial" fontWeight="900" fontSize="42" fill="#FFD700" letterSpacing="3">FCCA</text>
+      {/* Subtitle */}
+      <text x="82" y="88" fontFamily="Arial" fontWeight="600" fontSize="9.5" fill="#FFD700" letterSpacing="1.2">FRISCO COMMUNITY CRICKET ASSOCIATION</text>
+    </svg>
+  );
 }
 
 export default function DashboardShell() {
@@ -110,43 +133,23 @@ export default function DashboardShell() {
 
   return (
     <div className="shell">
-      {/* Header */}
-      <div className="brand-bar">
-        {/* FCCA Logo — inline SVG */}
-        <div className="brand-fcca">
-          <svg viewBox="0 0 260 90" xmlns="http://www.w3.org/2000/svg" className="fcca-svg">
-            <rect width="260" height="90" rx="8" fill="#0a1172"/>
-            {/* Cricket stumps */}
-            <line x1="18" y1="20" x2="18" y2="68" stroke="#FFD700" strokeWidth="3"/>
-            <line x1="26" y1="18" x2="26" y2="68" stroke="#FFD700" strokeWidth="3"/>
-            <line x1="34" y1="20" x2="34" y2="68" stroke="#FFD700" strokeWidth="3"/>
-            <line x1="16" y1="18" x2="36" y2="18" stroke="#FFD700" strokeWidth="2.5"/>
-            {/* Cricket bat */}
-            <rect x="36" y="30" width="10" height="36" rx="3" fill="#FFD700" transform="rotate(-30 36 30)"/>
-            <rect x="28" y="58" width="11" height="7" rx="2" fill="#FFD700" transform="rotate(-30 28 58)"/>
-            {/* Ball */}
-            <circle cx="52" cy="62" r="4" fill="#FFD700"/>
-            {/* FCCA text */}
-            <text x="68" y="55" fontFamily="Arial Black, Arial" fontWeight="900" fontSize="34" fill="#FFD700" letterSpacing="2">FCCA</text>
-            {/* Full name */}
-            <text x="68" y="72" fontFamily="Arial" fontWeight="600" fontSize="8" fill="#FFD700" letterSpacing="1">FRISCO COMMUNITY CRICKET ASSOCIATION</text>
-          </svg>
-        </div>
 
-        {/* Center title */}
+      {/* ── Brand Header ── */}
+      <div className="brand-bar">
+        <div className="brand-fcca">
+          <FCCALogo />
+        </div>
         <div className="brand-title">
           <h1>Sports Performance Dashboard</h1>
           <p>{parsed ? `📂 ${parsed.fileName}` : 'Upload an Excel file to get started'}</p>
         </div>
-
-        {/* YASH Technologies logo */}
         <div className="brand-yash">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/fcca-sports/yash-logo.png" alt="YASH Technologies" className="yash-img" />
         </div>
       </div>
 
-      {/* Upload Zone */}
+      {/* ── Upload Zone ── */}
       <div
         className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
         onClick={() => inputRef.current?.click()}
@@ -154,27 +157,23 @@ export default function DashboardShell() {
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       >
-        <input
-          ref={inputRef} type="file" accept=".xlsx,.xls,.csv"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
+        <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleFiles(e.target.files)} />
         <div className="upload-icon">{loading ? '⏳' : '📂'}</div>
         <h3>{loading ? 'Parsing your file…' : parsed ? 'Upload a different file' : 'Drop your Excel file here'}</h3>
         <p>{parsed ? `${parsed.rows.length} records loaded from ${parsed.columns.length} columns` : 'Supports .xlsx, .xls, .csv'}</p>
         {parsed && <span className="upload-badge">✅ {parsed.fileName}</span>}
       </div>
 
-      {/* Error */}
+      {/* ── Error ── */}
       {error && (
         <div style={{ background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#b91c1c', fontWeight:600 }}>
           ❌ {error}
         </div>
       )}
 
-      {/* Dashboard */}
+      {/* ── Dashboard Content ── */}
       {parsed && (
         <>
-          {/* KPI Cards */}
           <p className="section-title">Key Performance Indicators</p>
           <div className="kpi-grid">
             {kpis.map((kpi, i) => (
@@ -182,12 +181,10 @@ export default function DashboardShell() {
             ))}
           </div>
 
-          {/* Charts */}
           <p className="section-title">Visualizations</p>
           <ChartPanel data={parsed.rows} numericCols={parsed.numericCols} labelCol={parsed.labelCol} />
 
-          {/* Table */}
-          <p className="section-title">Data Explorer</p>
+          <p className="section-title">Players Participated</p>
           <DataTable columns={parsed.columns} rows={parsed.rows} />
         </>
       )}
@@ -198,6 +195,33 @@ export default function DashboardShell() {
           <p style={{ marginTop:12, fontWeight:600 }}>Your KPIs and charts will appear here after upload</p>
         </div>
       )}
+
+      {/* ── Facebook Footer ── */}
+      <footer className="fb-footer">
+        <div className="fb-footer-inner">
+          <div className="fb-left">
+            <FCCALogo />
+          </div>
+          <div className="fb-center">
+            <p className="fb-label">🏏 Stay connected with FCCA</p>
+            <p className="fb-tagline">Follow us on Facebook for match updates, schedules &amp; more!</p>
+            <a
+              href="https://www.facebook.com/share/1BczvQcatd/?mibextid=wwXIfr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="fb-btn"
+            >
+              <span className="fb-icon">f</span>
+              Like &nbsp;·&nbsp; Share &nbsp;·&nbsp; Follow
+            </a>
+          </div>
+          <div className="fb-right">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/fcca-sports/yash-logo.png" alt="YASH Technologies" className="yash-img" />
+          </div>
+        </div>
+      </footer>
+
     </div>
   );
 }

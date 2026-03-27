@@ -15,7 +15,7 @@ export default function DataTable({ columns, rows }: DataTableProps) {
 
   return (
     <div className="table-card">
-      <h3>📋 Raw Data — {rows.length} Records</h3>
+      <h3>🏏 Players Participated — {rows.length} Players</h3>
       <div className="table-wrap">
         <table>
           <thead>

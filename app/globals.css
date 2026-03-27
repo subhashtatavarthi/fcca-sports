@@ -7,10 +7,11 @@ body {
   background: linear-gradient(135deg, #87CEEB 0%, #b8e4f9 50%, #d4f0fc 100%);
   min-height: 100vh;
   color: #0f172a;
+  overflow-x: hidden;
 }
 
 /* ── Layout ── */
-.shell { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+.shell { max-width: 1400px; margin: 0 auto; padding: 24px 20px; overflow-x: hidden; }
 
 /* ── Brand Bar ── */
 .brand-bar {
@@ -29,27 +30,31 @@ body {
 
 /* Left: FCCA block */
 .brand-fcca {
-  flex: 0 0 220px;
+  flex: 0 0 260px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
-.fcca-svg { height: 90px; width: auto; border-radius: 8px; }
+/* SVG fills the container width so text never clips */
+.fcca-svg { width: 100%; height: auto; border-radius: 8px; display: block; }
 
 /* Center: title */
-.brand-title { flex: 1 1 auto; text-align: center; }
+.brand-title { flex: 1 1 auto; text-align: center; min-width: 0; }
 .brand-title h1 { font-size: 1.65rem; font-weight: 800; color: #0c4a6e; letter-spacing: -0.02em; }
 .brand-title p  { font-size: 0.82rem; color: #0369a1; margin-top: 3px; font-weight: 500; }
 
-/* Right: YASH block */
+/* Right: YASH block — symmetrical to FCCA */
 .brand-yash {
-  flex: 0 0 200px;
+  flex: 0 0 260px;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
 }
-.yash-img { height: 85px; width: auto; object-fit: contain; }
+.yash-img { width: 100%; max-width: 240px; height: auto; object-fit: contain; display: block; }
 
 /* FB button inside left panel */
 .fb-btn {

@@ -89,8 +89,8 @@ function buildKpis(parsed: ParsedData) {
 // ── FCCA SVG Logo ──────────────────────────────────────
 function FCCALogo() {
   return (
-    <svg viewBox="0 0 320 110" xmlns="http://www.w3.org/2000/svg" className="fcca-svg">
-      <rect width="320" height="110" rx="10" fill="#0a1172"/>
+    <svg viewBox="0 0 400 110" xmlns="http://www.w3.org/2000/svg" className="fcca-svg">
+      <rect width="400" height="110" rx="10" fill="#0a1172"/>
       {/* Stumps */}
       <line x1="22" y1="24" x2="22" y2="82" stroke="#FFD700" strokeWidth="3.5"/>
       <line x1="32" y1="22" x2="32" y2="82" stroke="#FFD700" strokeWidth="3.5"/>
@@ -103,8 +103,8 @@ function FCCALogo() {
       <circle cx="64" cy="76" r="5" fill="#FFD700"/>
       {/* FCCA */}
       <text x="82" y="68" fontFamily="Arial Black, Arial" fontWeight="900" fontSize="42" fill="#FFD700" letterSpacing="3">FCCA</text>
-      {/* Subtitle */}
-      <text x="82" y="88" fontFamily="Arial" fontWeight="600" fontSize="9.5" fill="#FFD700" letterSpacing="1.2">FRISCO COMMUNITY CRICKET ASSOCIATION</text>
+      {/* Full name — wider viewBox gives it room */}
+      <text x="82" y="90" fontFamily="Arial" fontWeight="600" fontSize="10" fill="#FFD700" letterSpacing="1.5">FRISCO COMMUNITY CRICKET ASSOCIATION</text>
     </svg>
   );
 }

@@ -136,13 +136,27 @@ export default function DashboardShell() {
 
       {/* ── Brand Header ── */}
       <div className="brand-bar">
+        {/* Left: FCCA logo + FB Like */}
         <div className="brand-fcca">
           <FCCALogo />
+          <a
+            href="https://www.facebook.com/share/1BczvQcatd/?mibextid=wwXIfr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fb-btn"
+          >
+            <span className="fb-icon">f</span>
+            Like &nbsp;·&nbsp; Share &nbsp;·&nbsp; Follow
+          </a>
         </div>
+
+        {/* Center: title */}
         <div className="brand-title">
           <h1>Sports Performance Dashboard</h1>
           <p>{parsed ? `📂 ${parsed.fileName}` : 'Upload an Excel file to get started'}</p>
         </div>
+
+        {/* Right: YASH logo */}
         <div className="brand-yash">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/fcca-sports/yash-logo.png" alt="YASH Technologies" className="yash-img" />
@@ -195,32 +209,6 @@ export default function DashboardShell() {
           <p style={{ marginTop:12, fontWeight:600 }}>Your KPIs and charts will appear here after upload</p>
         </div>
       )}
-
-      {/* ── Facebook Footer ── */}
-      <footer className="fb-footer">
-        <div className="fb-footer-inner">
-          <div className="fb-left">
-            <FCCALogo />
-          </div>
-          <div className="fb-center">
-            <p className="fb-label">🏏 Stay connected with FCCA</p>
-            <p className="fb-tagline">Follow us on Facebook for match updates, schedules &amp; more!</p>
-            <a
-              href="https://www.facebook.com/share/1BczvQcatd/?mibextid=wwXIfr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="fb-btn"
-            >
-              <span className="fb-icon">f</span>
-              Like &nbsp;·&nbsp; Share &nbsp;·&nbsp; Follow
-            </a>
-          </div>
-          <div className="fb-right">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/fcca-sports/yash-logo.png" alt="YASH Technologies" className="yash-img" />
-          </div>
-        </div>
-      </footer>
 
     </div>
   );

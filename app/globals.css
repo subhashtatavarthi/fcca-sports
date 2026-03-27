@@ -214,6 +214,35 @@ tbody td { padding: 9px 14px; border-bottom: 1px solid rgba(14,165,233,0.1); col
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Persistence Banner ── */
+.persist-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 10px 18px;
+  margin-bottom: 20px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  flex-wrap: wrap;
+  animation: fadeUp 0.3s ease;
+}
+.persist-public { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+.persist-local  { background: #e0f2fe; border: 1px solid #7dd3fc; color: #0c4a6e; }
+.persist-new    { background: #f0fdf4; border: 1px solid #6ee7b7; color: #065f46; }
+.persist-info   { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; }
+.persist-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.persist-btn {
+  padding: 5px 14px; border-radius: 20px; border: none;
+  font-size: 0.78rem; font-weight: 700; cursor: pointer;
+  background: rgba(0,0,0,0.08); color: inherit; transition: background 0.15s;
+}
+.persist-btn:hover { background: rgba(0,0,0,0.15); }
+.persist-clear { background: rgba(220,38,38,0.1); color: #b91c1c; }
+.persist-clear:hover { background: rgba(220,38,38,0.2); }
+
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .charts-grid { grid-template-columns: 1fr; }

@@ -111,11 +111,38 @@ export default function DashboardShell() {
   return (
     <div className="shell">
       {/* Header */}
-      <div className="header">
-        <div className="header-icon">🏅</div>
-        <div>
-          <h1>FCCA Sports Dashboard</h1>
-          <p>{parsed ? `Viewing: ${parsed.fileName}` : 'Upload an Excel file to get started'}</p>
+      <div className="brand-bar">
+        {/* FCCA Logo — inline SVG */}
+        <div className="brand-fcca">
+          <svg viewBox="0 0 260 90" xmlns="http://www.w3.org/2000/svg" className="fcca-svg">
+            <rect width="260" height="90" rx="8" fill="#0a1172"/>
+            {/* Cricket stumps */}
+            <line x1="18" y1="20" x2="18" y2="68" stroke="#FFD700" strokeWidth="3"/>
+            <line x1="26" y1="18" x2="26" y2="68" stroke="#FFD700" strokeWidth="3"/>
+            <line x1="34" y1="20" x2="34" y2="68" stroke="#FFD700" strokeWidth="3"/>
+            <line x1="16" y1="18" x2="36" y2="18" stroke="#FFD700" strokeWidth="2.5"/>
+            {/* Cricket bat */}
+            <rect x="36" y="30" width="10" height="36" rx="3" fill="#FFD700" transform="rotate(-30 36 30)"/>
+            <rect x="28" y="58" width="11" height="7" rx="2" fill="#FFD700" transform="rotate(-30 28 58)"/>
+            {/* Ball */}
+            <circle cx="52" cy="62" r="4" fill="#FFD700"/>
+            {/* FCCA text */}
+            <text x="68" y="55" fontFamily="Arial Black, Arial" fontWeight="900" fontSize="34" fill="#FFD700" letterSpacing="2">FCCA</text>
+            {/* Full name */}
+            <text x="68" y="72" fontFamily="Arial" fontWeight="600" fontSize="8" fill="#FFD700" letterSpacing="1">FRISCO COMMUNITY CRICKET ASSOCIATION</text>
+          </svg>
+        </div>
+
+        {/* Center title */}
+        <div className="brand-title">
+          <h1>Sports Performance Dashboard</h1>
+          <p>{parsed ? `📂 ${parsed.fileName}` : 'Upload an Excel file to get started'}</p>
+        </div>
+
+        {/* YASH Technologies logo */}
+        <div className="brand-yash">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/fcca-sports/yash-logo.png" alt="YASH Technologies" className="yash-img" />
         </div>
       </div>
 

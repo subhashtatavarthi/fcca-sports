@@ -20,7 +20,7 @@ type ActiveTab = 'dashboard' | 'schedule';
 
 // ── Constants ──────────────────────────────────────────
 const LS_KEY_PERF  = 'fcca_dashboard_data';
-const LS_KEY_SCHED = 'fcca_schedule_data';
+const LS_KEY_SCHED = 'fcca_schedule_data_v2'; // v2 = raw:false time formatting
 const PUBLIC_PERF_URL  = '/fcca-sports/data.xlsx';
 const PUBLIC_SCHED_URL = '/fcca-sports/schedule.xlsx';
 
@@ -42,10 +42,12 @@ function fmt(v: number) {
   return v%1===0 ? String(v) : v.toFixed(2);
 }
 
-function parseArrayBuffer(data: ArrayBuffer, fileName: string): ParsedData {
+function parseArrayBuffer(data: ArrayBuffer, fileName: string, rawMode = true): ParsedData {
   const wb = XLSX.read(new Uint8Array(data), { type:'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: Record<string,any>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
+  // raw:false = use Excel's formatted text (preserves "5:30 PM" etc.)
+  // raw:true  = raw numbers (needed for KPI calculations)
+  const rows: Record<string,any>[] = XLSX.utils.sheet_to_json(ws, { defval: null, raw: rawMode });
   if (!rows.length) throw new Error('No data found in file');
   const columns = Object.keys(rows[0]);
   const numericCols = columns.filter(col =>
@@ -56,11 +58,11 @@ function parseArrayBuffer(data: ArrayBuffer, fileName: string): ParsedData {
   ) ?? columns[0];
   return { columns, rows, numericCols, labelCol, fileName, uploadedAt: new Date().toLocaleString() };
 }
-function parseFile(file: File): Promise<ParsedData> {
+function parseFile(file: File, rawMode = true): Promise<ParsedData> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      try { resolve(parseArrayBuffer(e.target!.result as ArrayBuffer, file.name)); }
+      try { resolve(parseArrayBuffer(e.target!.result as ArrayBuffer, file.name, rawMode)); }
       catch(err) { reject(err); }
     };
     reader.onerror = reject;
@@ -185,7 +187,7 @@ export default function DashboardShell() {
         setSchedMsg('Loading shared schedule…');
         const res = await fetch(PUBLIC_SCHED_URL, { cache:'no-store' });
         if (res.ok) {
-          const p = parseArrayBuffer(await res.arrayBuffer(), 'FCCA Schedule');
+          const p = parseArrayBuffer(await res.arrayBuffer(), 'FCCA Schedule', false);
           p.uploadedAt = undefined;
           setSched(p); setSchedSource('public');
         }
@@ -209,11 +211,12 @@ export default function DashboardShell() {
     if (!files[0]) return;
     setSchedLoading(true); setSchedMsg('Parsing file…'); setSchedError('');
     try {
-      const p = await parseFile(files[0]);
+      const p = await parseFile(files[0], false); // raw:false preserves time formatting
       setSched(p); setSchedSource('new'); lsSave(LS_KEY_SCHED, p);
     } catch (e: any) { setSchedError(e.message ?? 'Failed to parse file.'); }
     finally { setSchedLoading(false); }
   }, []);
+
 
   const kpis = perf ? buildKpis(perf) : [];
 

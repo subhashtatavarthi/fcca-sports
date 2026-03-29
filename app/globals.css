@@ -449,3 +449,120 @@ tbody td { padding: 9px 14px; border-bottom: 1px solid rgba(14,165,233,0.1); col
 }
 .empty-state > div { font-size: 4rem; }
 .empty-state > p { margin-top: 12px; font-weight: 600; }
+
+/* ── Schedule two-column layout ── */
+.sched-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .sched-layout { grid-template-columns: 1fr; }
+}
+.sched-main { min-width: 0; }
+.sched-view { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── History sidebar ── */
+.hist-sidebar {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.85);
+  padding: 14px;
+  box-shadow: 0 4px 20px rgba(3,105,161,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 20px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+.hist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hist-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0c4a6e;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.hist-upload-btn {
+  background: linear-gradient(135deg, #0ea5e9, #0369a1);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.hist-upload-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(3,105,161,0.3); }
+
+.hist-empty {
+  font-size: 0.78rem;
+  color: #64748b;
+  text-align: center;
+  padding: 20px 8px;
+}
+.hist-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: calc(80vh - 80px);
+}
+.hist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(14,165,233,0.05);
+  border: 1.5px solid transparent;
+  transition: all 0.18s ease;
+}
+.hist-item:hover { background: rgba(14,165,233,0.12); border-color: rgba(14,165,233,0.3); }
+.hist-active {
+  background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(3,105,161,0.12)) !important;
+  border-color: #0ea5e9 !important;
+}
+.hist-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hist-item-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0c4a6e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.hist-item-date { font-size: 0.68rem; color: #0369a1; }
+.hist-item-rows { font-size: 0.68rem; color: #64748b; }
+.hist-delete {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.hist-delete:hover { color: #ef4444; background: rgba(239,68,68,0.1); }

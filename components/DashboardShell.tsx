@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import KpiCard from './KpiCard';
 import DataTable from './DataTable';
 import ChartPanel from './ChartPanel';
-import ScheduleTable from './ScheduleTable';
+import { ScheduleHistory, ScheduleView, ScheduleEntry } from './ScheduleTable';
 
 // ── Types ──────────────────────────────────────────────
 interface ParsedData {
@@ -19,8 +19,8 @@ interface ParsedData {
 type ActiveTab = 'dashboard' | 'schedule';
 
 // ── Constants ──────────────────────────────────────────
-const LS_KEY_PERF  = 'fcca_dashboard_data';
-const LS_KEY_SCHED = 'fcca_schedule_data_v2'; // v2 = raw:false time formatting
+const LS_KEY_PERF    = 'fcca_dashboard_data';
+const LS_KEY_SCHED   = 'fcca_schedule_history_v1'; // stores ScheduleEntry[]
 const PUBLIC_PERF_URL  = '/fcca-sports/data.xlsx';
 const PUBLIC_SCHED_URL = '/fcca-sports/schedule.xlsx';
 
@@ -153,13 +153,15 @@ export default function DashboardShell() {
   const [perfError, setPerfError] = useState('');
   const perfInput = useRef<HTMLInputElement>(null);
 
-  // Schedule tab state
-  const [sched, setSched] = useState<ParsedData|null>(null);
-  const [schedSource, setSchedSource] = useState<'public'|'local'|'new'|null>(null);
-  const [schedLoading, setSchedLoading] = useState(true);
-  const [schedMsg, setSchedMsg] = useState('Loading schedule…');
+  // Schedule tab state — history array
+  const [schedHistory, setSchedHistory] = useState<ScheduleEntry[]>([]);
+  const [activeSchedId, setActiveSchedId] = useState<string|null>(null);
+  const [schedLoading, setSchedLoading] = useState(false);
   const [schedError, setSchedError] = useState('');
   const schedInput = useRef<HTMLInputElement>(null);
+
+  // Derived: currently selected entry
+  const activeSched = schedHistory.find(e => e.id === activeSchedId) ?? null;
 
   // ── Auto-load on mount ─────────────────────────────
   useEffect(() => {
@@ -179,22 +181,37 @@ export default function DashboardShell() {
       setPerfLoading(false);
     })();
 
-    // Schedule data
+    // Schedule history from localStorage
     (async () => {
-      const saved = lsLoad(LS_KEY_SCHED);
-      if (saved) { setSched(saved); setSchedSource('local'); setSchedLoading(false); return; }
       try {
-        setSchedMsg('Loading shared schedule…');
-        const res = await fetch(PUBLIC_SCHED_URL, { cache:'no-store' });
-        if (res.ok) {
-          const p = parseArrayBuffer(await res.arrayBuffer(), 'FCCA Schedule', false);
-          p.uploadedAt = undefined;
-          setSched(p); setSchedSource('public');
+        const raw = localStorage.getItem(LS_KEY_SCHED);
+        if (raw) {
+          const hist: ScheduleEntry[] = JSON.parse(raw);
+          if (hist.length) {
+            setSchedHistory(hist);
+            setActiveSchedId(hist[0].id); // most recent first
+          }
+        } else {
+          // Try public schedule file as first seed entry
+          try {
+            const res = await fetch(PUBLIC_SCHED_URL, { cache:'no-store' });
+            if (res.ok) {
+              const wb = XLSX.read(new Uint8Array(await res.arrayBuffer()), { type:'array' });
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string,any>[];
+              if (rows.length) {
+                const cols = Object.keys(rows[0]);
+                const entry: ScheduleEntry = { id: 'public', fileName: 'FCCA Schedule (Shared)', uploadedAt: 'Shared file', columns: cols, rows };
+                setSchedHistory([entry]);
+                setActiveSchedId('public');
+              }
+            }
+          } catch {}
         }
       } catch {}
-      setSchedLoading(false);
     })();
   }, []);
+
 
   // ── File handlers ──────────────────────────────────
   const handlePerfFiles = useCallback(async (files: FileList) => {
@@ -209,13 +226,44 @@ export default function DashboardShell() {
 
   const handleSchedFiles = useCallback(async (files: FileList) => {
     if (!files[0]) return;
-    setSchedLoading(true); setSchedMsg('Parsing file…'); setSchedError('');
+    setSchedLoading(true); setSchedError('');
     try {
-      const p = await parseFile(files[0], false); // raw:false preserves time formatting
-      setSched(p); setSchedSource('new'); lsSave(LS_KEY_SCHED, p);
+      const buf = await files[0].arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string,any>[];
+      if (!rows.length) throw new Error('No data found in file');
+      const cols = Object.keys(rows[0]);
+      const entry: ScheduleEntry = {
+        id: Date.now().toString(),
+        fileName: files[0].name,
+        uploadedAt: new Date().toLocaleString(),
+        columns: cols,
+        rows,
+      };
+      // Prepend new entry (most recent first)
+      setSchedHistory(prev => {
+        const updated = [entry, ...prev];
+        try { localStorage.setItem(LS_KEY_SCHED, JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+      setActiveSchedId(entry.id);
     } catch (e: any) { setSchedError(e.message ?? 'Failed to parse file.'); }
     finally { setSchedLoading(false); }
   }, []);
+
+  const deleteSchedEntry = useCallback((id: string) => {
+    setSchedHistory(prev => {
+      const updated = prev.filter(e => e.id !== id);
+      try { localStorage.setItem(LS_KEY_SCHED, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    setActiveSchedId(prev => {
+      if (prev !== id) return prev;
+      const remaining = schedHistory.filter(e => e.id !== id);
+      return remaining.length ? remaining[0].id : null;
+    });
+  }, [schedHistory]);
 
 
   const kpis = perf ? buildKpis(perf) : [];
@@ -330,40 +378,42 @@ export default function DashboardShell() {
       ══════════════════════════════════════════════ */}
       {tab === 'schedule' && (
         <>
-          {!sched && (
-            <>
-              <div className="sched-hero">
-                <h2>📅 April 2026 Planning Schedule</h2>
-                <p>Upload your schedule file to view, search and sort all match and event data.</p>
-              </div>
-              <UploadZone onFiles={handleSchedFiles} loading={schedLoading} msg={schedMsg} />
-            </>
-          )}
+          <div className="sched-hero">
+            <h2>📅 Planning Schedule History</h2>
+            <p>{schedHistory.length ? `${schedHistory.length} schedule${schedHistory.length>1?'s':''} saved · click any entry to view` : 'Upload schedule files — they are all preserved in history'}</p>
+          </div>
           {schedError && <div className="error-banner">❌ {schedError}</div>}
-          {sched && (
-            <>
-              <div className="sched-hero">
-                <h2>📅 Planning Schedule</h2>
-                <p>Full schedule — {sched.rows.length} events · Click any column header to sort</p>
-              </div>
-              <ScheduleTable
-                columns={sched.columns}
-                rows={sched.rows}
-                fileName={sched.fileName}
-                uploadedAt={sched.uploadedAt}
-                onChangeFile={() => schedInput.current?.click()}
-                onClear={() => { lsClear(LS_KEY_SCHED); setSched(null); setSchedSource(null); }}
-              />
-              <input ref={schedInput} type="file" accept=".xlsx,.xls,.csv"
-                     style={{ display:'none' }} onChange={e => e.target.files && handleSchedFiles(e.target.files)} />
-            </>
-          )}
-          {!sched && !schedLoading && (
-            <div className="empty-state">
-              <div>📅</div>
-              <p>Upload your April 2026 schedule Excel file to view it here</p>
+
+          {/* Hidden file input */}
+          <input ref={schedInput} type="file" accept=".xlsx,.xls,.csv"
+                 style={{ display:'none' }}
+                 onChange={e => e.target.files && handleSchedFiles(e.target.files)} />
+
+          {/* Two-column layout: sidebar + main view */}
+          <div className="sched-layout">
+            <ScheduleHistory
+              entries={schedHistory}
+              activeId={activeSchedId}
+              onSelect={setActiveSchedId}
+              onDelete={deleteSchedEntry}
+              onUploadClick={() => schedInput.current?.click()}
+            />
+            <div className="sched-main">
+              {schedLoading && (
+                <div className="empty-state"><div>⏳</div><p>Parsing file…</p></div>
+              )}
+              {!schedLoading && !activeSched && (
+                <div className="empty-state">
+                  <div>📅</div>
+                  <p>Upload your first schedule file using the button in the history panel</p>
+                  <p style={{ fontSize:'0.8rem', marginTop:8 }}>Each upload is saved separately — April, May, June… all preserved</p>
+                </div>
+              )}
+              {activeSched && !schedLoading && (
+                <ScheduleView entry={activeSched} />
+              )}
             </div>
-          )}
+          </div>
         </>
       )}
 

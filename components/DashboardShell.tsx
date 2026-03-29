@@ -4,7 +4,9 @@ import * as XLSX from 'xlsx';
 import KpiCard from './KpiCard';
 import DataTable from './DataTable';
 import ChartPanel from './ChartPanel';
+import ScheduleTable from './ScheduleTable';
 
+// ── Types ──────────────────────────────────────────────
 interface ParsedData {
   columns: string[];
   rows: Record<string, any>[];
@@ -14,13 +16,19 @@ interface ParsedData {
   uploadedAt?: string;
 }
 
-const LS_KEY = 'fcca_dashboard_data';
-const PUBLIC_DATA_URL = '/fcca-sports/data.xlsx';
+type ActiveTab = 'dashboard' | 'schedule';
 
+// ── Constants ──────────────────────────────────────────
+const LS_KEY_PERF  = 'fcca_dashboard_data';
+const LS_KEY_SCHED = 'fcca_schedule_data';
+const PUBLIC_PERF_URL  = '/fcca-sports/data.xlsx';
+const PUBLIC_SCHED_URL = '/fcca-sports/schedule.xlsx';
+
+// ── Helpers ────────────────────────────────────────────
 const ICONS: Record<string, string> = {
-  total: '👥', avg: '📊', max: '🏆', min: '📉', sheets: '📄',
-  score: '🎯', weight: '⚖️', height: '📏', age: '🎂', bmi: '🧬',
-  time: '⏱️', default: '📈'
+  total:'👥', avg:'📊', max:'🏆', min:'📉',
+  score:'🎯', weight:'⚖️', height:'📏', age:'🎂',
+  time:'⏱️', default:'📈'
 };
 function iconFor(label: string) {
   const l = label.toLowerCase();
@@ -29,32 +37,31 @@ function iconFor(label: string) {
 }
 function fmt(v: number) {
   if (isNaN(v)) return '—';
-  if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
-  if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K';
-  return v % 1 === 0 ? String(v) : v.toFixed(2);
+  if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1)+'M';
+  if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1)+'K';
+  return v%1===0 ? String(v) : v.toFixed(2);
 }
 
 function parseArrayBuffer(data: ArrayBuffer, fileName: string): ParsedData {
-  const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+  const wb = XLSX.read(new Uint8Array(data), { type:'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
+  const rows: Record<string,any>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
   if (!rows.length) throw new Error('No data found in file');
   const columns = Object.keys(rows[0]);
   const numericCols = columns.filter(col =>
-    rows.slice(0, 20).filter(r => r[col] !== null && r[col] !== '').some(r => !isNaN(parseFloat(r[col])))
+    rows.slice(0,20).filter(r => r[col]!==null && r[col]!=='').some(r => !isNaN(parseFloat(r[col])))
   );
   const labelCol = columns.find(c =>
-    !numericCols.includes(c) && rows.filter(r => r[c]).length > rows.length * 0.5
+    !numericCols.includes(c) && rows.filter(r => r[c]).length > rows.length*0.5
   ) ?? columns[0];
   return { columns, rows, numericCols, labelCol, fileName, uploadedAt: new Date().toLocaleString() };
 }
-
 function parseFile(file: File): Promise<ParsedData> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try { resolve(parseArrayBuffer(e.target!.result as ArrayBuffer, file.name)); }
-      catch (err) { reject(err); }
+      catch(err) { reject(err); }
     };
     reader.onerror = reject;
     reader.readAsArrayBuffer(file);
@@ -63,22 +70,32 @@ function parseFile(file: File): Promise<ParsedData> {
 
 function buildKpis(parsed: ParsedData) {
   const { rows, numericCols, fileName } = parsed;
-  const kpis: { label: string; value: string; sub?: string; icon?: string }[] = [];
-  kpis.push({ label: 'Total Players', value: String(rows.length), sub: fileName, icon: '👥' });
-  numericCols.slice(0, 7).forEach(col => {
+  const kpis: {label:string;value:string;sub?:string;icon?:string}[] = [];
+  kpis.push({ label:'Total Players', value:String(rows.length), sub:fileName, icon:'👥' });
+  numericCols.slice(0,7).forEach(col => {
     const vals = rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
     if (!vals.length) return;
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const max = Math.max(...vals);
-    const min = Math.min(...vals);
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const max = Math.max(...vals), min = Math.min(...vals);
     kpis.push({
-      label: col.length > 20 ? col.slice(0, 20) + '…' : col,
+      label: col.length>20 ? col.slice(0,20)+'…' : col,
       value: fmt(avg),
       sub: `Max: ${fmt(max)}  •  Min: ${fmt(min)}  •  n=${vals.length}`,
       icon: iconFor(col),
     });
   });
   return kpis;
+}
+
+// ── localStorage helpers ───────────────────────────────
+function lsSave(key: string, data: ParsedData) {
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+}
+function lsLoad(key: string): ParsedData | null {
+  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function lsClear(key: string) {
+  try { localStorage.removeItem(key); } catch {}
 }
 
 // ── FCCA SVG Logo ──────────────────────────────────────
@@ -99,84 +116,126 @@ function FCCALogo() {
   );
 }
 
-// ── helpers ────────────────────────────────────────────
-function saveToLocalStorage(data: ParsedData) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
-}
-function loadFromLocalStorage(): ParsedData | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-function clearLocalStorage() {
-  try { localStorage.removeItem(LS_KEY); } catch {}
+// ── Upload Zone ────────────────────────────────────────
+function UploadZone({ onFiles, loading, msg }: {
+  onFiles: (f: FileList) => void;
+  loading: boolean;
+  msg?: string;
+}) {
+  const [drag, setDrag] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className={`upload-zone ${drag ? 'drag-over' : ''}`}
+         onClick={() => ref.current?.click()}
+         onDragOver={e => { e.preventDefault(); setDrag(true); }}
+         onDragLeave={() => setDrag(false)}
+         onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files) onFiles(e.dataTransfer.files); }}>
+      <input ref={ref} type="file" accept=".xlsx,.xls,.csv"
+             onChange={e => e.target.files && onFiles(e.target.files)} />
+      <div className="upload-icon">{loading ? '⏳' : '📂'}</div>
+      <h3>{loading ? (msg ?? 'Loading…') : 'Drop your Excel / CSV file here'}</h3>
+      <p>{loading ? 'Please wait…' : 'Supports .xlsx  ·  .xls  ·  .csv'}</p>
+    </div>
+  );
 }
 
 // ── Main Component ─────────────────────────────────────
 export default function DashboardShell() {
-  const [parsed, setParsed] = useState<ParsedData | null>(null);
-  const [error, setError] = useState<string>('');
-  const [loading, setLoading] = useState(true);   // starts true while we check for saved data
-  const [loadingMsg, setLoadingMsg] = useState('Loading saved dashboard…');
-  const [dragOver, setDragOver] = useState(false);
-  const [source, setSource] = useState<'public' | 'local' | 'new' | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<ActiveTab>('dashboard');
 
-  // ── On mount: localStorage first (user's upload wins), then public file ──
+  // Performance tab state
+  const [perf, setPerf] = useState<ParsedData|null>(null);
+  const [perfSource, setPerfSource] = useState<'public'|'local'|'new'|null>(null);
+  const [perfLoading, setPerfLoading] = useState(true);
+  const [perfMsg, setPerfMsg] = useState('Loading saved dashboard…');
+  const [perfError, setPerfError] = useState('');
+  const perfInput = useRef<HTMLInputElement>(null);
+
+  // Schedule tab state
+  const [sched, setSched] = useState<ParsedData|null>(null);
+  const [schedSource, setSchedSource] = useState<'public'|'local'|'new'|null>(null);
+  const [schedLoading, setSchedLoading] = useState(true);
+  const [schedMsg, setSchedMsg] = useState('Loading schedule…');
+  const [schedError, setSchedError] = useState('');
+  const schedInput = useRef<HTMLInputElement>(null);
+
+  // ── Auto-load on mount ─────────────────────────────
   useEffect(() => {
-    async function autoLoad() {
-      // 1. Use localStorage if the user has previously uploaded a file
-      //    This always takes priority so their latest upload is never overwritten
-      const saved = loadFromLocalStorage();
-      if (saved) {
-        setParsed(saved);
-        setSource('local');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fall back to the committed public data file (shared default for new visitors)
+    // Performance data
+    (async () => {
+      const saved = lsLoad(LS_KEY_PERF);
+      if (saved) { setPerf(saved); setPerfSource('local'); setPerfLoading(false); return; }
       try {
-        setLoadingMsg('Loading shared dashboard data…');
-        const res = await fetch(PUBLIC_DATA_URL, { cache: 'no-store' });
+        setPerfMsg('Loading shared dashboard data…');
+        const res = await fetch(PUBLIC_PERF_URL, { cache:'no-store' });
         if (res.ok) {
-          const buf = await res.arrayBuffer();
-          const p = parseArrayBuffer(buf, 'FCCA Shared Data');
+          const p = parseArrayBuffer(await res.arrayBuffer(), 'FCCA Shared Data');
           p.uploadedAt = undefined;
-          setParsed(p);
-          setSource('public');
+          setPerf(p); setPerfSource('public');
         }
       } catch {}
+      setPerfLoading(false);
+    })();
 
-      setLoading(false);
-    }
-    autoLoad();
+    // Schedule data
+    (async () => {
+      const saved = lsLoad(LS_KEY_SCHED);
+      if (saved) { setSched(saved); setSchedSource('local'); setSchedLoading(false); return; }
+      try {
+        setSchedMsg('Loading shared schedule…');
+        const res = await fetch(PUBLIC_SCHED_URL, { cache:'no-store' });
+        if (res.ok) {
+          const p = parseArrayBuffer(await res.arrayBuffer(), 'FCCA Schedule');
+          p.uploadedAt = undefined;
+          setSched(p); setSchedSource('public');
+        }
+      } catch {}
+      setSchedLoading(false);
+    })();
   }, []);
 
-
-  const handleFiles = useCallback(async (files: FileList | null) => {
-    if (!files || !files[0]) return;
-    setLoading(true); setLoadingMsg('Parsing your file…'); setError('');
+  // ── File handlers ──────────────────────────────────
+  const handlePerfFiles = useCallback(async (files: FileList) => {
+    if (!files[0]) return;
+    setPerfLoading(true); setPerfMsg('Parsing file…'); setPerfError('');
     try {
       const p = await parseFile(files[0]);
-      setParsed(p);
-      setSource('new');
-      saveToLocalStorage(p);          // persist in this browser
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to parse file.');
-    } finally {
-      setLoading(false);
-    }
+      setPerf(p); setPerfSource('new'); lsSave(LS_KEY_PERF, p);
+    } catch (e: any) { setPerfError(e.message ?? 'Failed to parse file.'); }
+    finally { setPerfLoading(false); }
   }, []);
 
-  const handleClear = () => {
-    clearLocalStorage();
-    setParsed(null);
-    setSource(null);
-  };
+  const handleSchedFiles = useCallback(async (files: FileList) => {
+    if (!files[0]) return;
+    setSchedLoading(true); setSchedMsg('Parsing file…'); setSchedError('');
+    try {
+      const p = await parseFile(files[0]);
+      setSched(p); setSchedSource('new'); lsSave(LS_KEY_SCHED, p);
+    } catch (e: any) { setSchedError(e.message ?? 'Failed to parse file.'); }
+    finally { setSchedLoading(false); }
+  }, []);
 
-  const kpis = parsed ? buildKpis(parsed) : [];
+  const kpis = perf ? buildKpis(perf) : [];
+
+  // ── Source banner text ────────────────────────────
+  const PersistBanner = ({ source, data, onUpdate, onClear }: {
+    source: 'public'|'local'|'new'|null;
+    data: ParsedData;
+    onUpdate: () => void;
+    onClear: () => void;
+  }) => (
+    <div className={`persist-banner ${source==='public'?'persist-public':source==='local'?'persist-local':'persist-new'}`}>
+      <div className="persist-info">
+        {source==='public' && <><span>🌐</span><span>Shared data — visible to everyone who visits this URL</span></>}
+        {source==='local'  && <><span>💾</span><span>Restored from your last upload: <strong>{data.fileName}</strong>{data.uploadedAt ? ` — ${data.uploadedAt}` : ''}</span></>}
+        {source==='new'    && <><span>✅</span><span>Loaded: <strong>{data.fileName}</strong> — saved to your browser</span></>}
+      </div>
+      <div className="persist-actions">
+        <button className="persist-btn" onClick={onUpdate}>🔄 Update File</button>
+        {source!=='public' && <button className="persist-btn persist-clear" onClick={onClear}>✖ Clear</button>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="shell">
@@ -192,8 +251,8 @@ export default function DashboardShell() {
           </a>
         </div>
         <div className="brand-title">
-          <h1>Sports Performance Dashboard</h1>
-          <p>{parsed ? `📂 ${parsed.fileName}` : 'Upload an Excel file to get started'}</p>
+          <h1>FCCA Sports Hub</h1>
+          <p>Frisco Community Cricket Association</p>
         </div>
         <div className="brand-yash">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -201,72 +260,108 @@ export default function DashboardShell() {
         </div>
       </div>
 
-      {/* ── Persistence Banner ── */}
-      {parsed && (
-        <div className={`persist-banner ${source === 'public' ? 'persist-public' : source === 'local' ? 'persist-local' : 'persist-new'}`}>
-          <div className="persist-info">
-            {source === 'public' && <><span>🌐</span><span>Shared dashboard — visible to everyone who visits this URL</span></>}
-            {source === 'local'  && <><span>💾</span><span>Restored from your last upload: <strong>{parsed.fileName}</strong>{parsed.uploadedAt ? ` — ${parsed.uploadedAt}` : ''}</span></>}
-            {source === 'new'    && <><span>✅</span><span>Loaded: <strong>{parsed.fileName}</strong> — saved to your browser for next visit</span></>}
-          </div>
-          <div className="persist-actions">
-            <button className="persist-btn" onClick={() => inputRef.current?.click()}>🔄 Update File</button>
-            {source !== 'public' && <button className="persist-btn persist-clear" onClick={handleClear}>✖ Clear</button>}
-          </div>
-        </div>
-      )}
+      {/* ── Tab Navigation ── */}
+      <div className="tab-bar">
+        <button
+          className={`tab-btn ${tab==='dashboard' ? 'tab-active' : ''}`}
+          onClick={() => setTab('dashboard')}
+        >
+          📊 Performance Dashboard
+        </button>
+        <button
+          className={`tab-btn ${tab==='schedule' ? 'tab-active' : ''}`}
+          onClick={() => setTab('schedule')}
+        >
+          📅 Planning Schedule
+        </button>
+      </div>
 
-      {/* ── Upload Zone — shown when no data or collapsed ── */}
-      {!parsed && (
-        <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
-             onClick={() => inputRef.current?.click()}
-             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-             onDragLeave={() => setDragOver(false)}
-             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}>
-          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleFiles(e.target.files)} />
-          <div className="upload-icon">{loading ? '⏳' : '📂'}</div>
-          <h3>{loading ? loadingMsg : 'Drop your Excel file here'}</h3>
-          <p>{loading ? 'Please wait…' : 'Supports .xlsx, .xls, .csv'}</p>
-        </div>
-      )}
-
-      {/* Hidden input when data already loaded */}
-      {parsed && (
-        <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv"
-               style={{ display:'none' }} onChange={(e) => handleFiles(e.target.files)} />
-      )}
-
-      {/* ── Error ── */}
-      {error && (
-        <div style={{ background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#b91c1c', fontWeight:600 }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {/* ── Dashboard Content ── */}
-      {parsed && (
+      {/* ══════════════════════════════════════════════
+          TAB 1 — Performance Dashboard
+      ══════════════════════════════════════════════ */}
+      {tab === 'dashboard' && (
         <>
-          <p className="section-title">Key Performance Indicators</p>
-          <div className="kpi-grid">
-            {kpis.map((kpi, i) => (
-              <KpiCard key={i} label={kpi.label} value={kpi.value} sub={kpi.sub} icon={kpi.icon} delay={i * 60} />
-            ))}
-          </div>
-          <p className="section-title">Visualizations</p>
-          <ChartPanel data={parsed.rows} numericCols={parsed.numericCols} labelCol={parsed.labelCol} />
-          <p className="section-title">Players Participated</p>
-          <DataTable columns={parsed.columns} rows={parsed.rows} />
+          {perf && (
+            <PersistBanner
+              source={perfSource}
+              data={perf}
+              onUpdate={() => perfInput.current?.click()}
+              onClear={() => { lsClear(LS_KEY_PERF); setPerf(null); setPerfSource(null); }}
+            />
+          )}
+          {/* Hidden input when data already loaded */}
+          <input ref={perfInput} type="file" accept=".xlsx,.xls,.csv"
+                 style={{ display:'none' }} onChange={e => e.target.files && handlePerfFiles(e.target.files)} />
+
+          {!perf && (
+            <UploadZone onFiles={handlePerfFiles} loading={perfLoading} msg={perfMsg} />
+          )}
+          {perfError && (
+            <div className="error-banner">❌ {perfError}</div>
+          )}
+          {perf && (
+            <>
+              <p className="section-title">Key Performance Indicators</p>
+              <div className="kpi-grid">
+                {kpis.map((kpi,i) => (
+                  <KpiCard key={i} label={kpi.label} value={kpi.value} sub={kpi.sub} icon={kpi.icon} delay={i*60} />
+                ))}
+              </div>
+              <p className="section-title">Visualizations</p>
+              <ChartPanel data={perf.rows} numericCols={perf.numericCols} labelCol={perf.labelCol} />
+              <p className="section-title">Players Participated</p>
+              <DataTable columns={perf.columns} rows={perf.rows} />
+            </>
+          )}
+          {!perf && !perfLoading && (
+            <div className="empty-state">
+              <div>📊</div>
+              <p>Your KPIs and charts will appear here after upload</p>
+            </div>
+          )}
         </>
       )}
 
-      {!parsed && !loading && (
-        <div style={{ textAlign:'center', marginTop:60, color:'#0369a1', opacity:0.6 }}>
-          <div style={{ fontSize:'4rem' }}>📊</div>
-          <p style={{ marginTop:12, fontWeight:600 }}>Your KPIs and charts will appear here after upload</p>
-          <p style={{ marginTop:8, fontSize:'0.8rem' }}>
-            💡 <strong>Tip:</strong> To make the dashboard visible to everyone permanently, commit your Excel file as <code>public/data.xlsx</code> in the repository.
-          </p>
-        </div>
+      {/* ══════════════════════════════════════════════
+          TAB 2 — Planning Schedule
+      ══════════════════════════════════════════════ */}
+      {tab === 'schedule' && (
+        <>
+          {!sched && (
+            <>
+              <div className="sched-hero">
+                <h2>📅 April 2026 Planning Schedule</h2>
+                <p>Upload your schedule file to view, search and sort all match and event data.</p>
+              </div>
+              <UploadZone onFiles={handleSchedFiles} loading={schedLoading} msg={schedMsg} />
+            </>
+          )}
+          {schedError && <div className="error-banner">❌ {schedError}</div>}
+          {sched && (
+            <>
+              <div className="sched-hero">
+                <h2>📅 Planning Schedule</h2>
+                <p>Full schedule — {sched.rows.length} events · Click any column header to sort</p>
+              </div>
+              <ScheduleTable
+                columns={sched.columns}
+                rows={sched.rows}
+                fileName={sched.fileName}
+                uploadedAt={sched.uploadedAt}
+                onChangeFile={() => schedInput.current?.click()}
+                onClear={() => { lsClear(LS_KEY_SCHED); setSched(null); setSchedSource(null); }}
+              />
+              <input ref={schedInput} type="file" accept=".xlsx,.xls,.csv"
+                     style={{ display:'none' }} onChange={e => e.target.files && handleSchedFiles(e.target.files)} />
+            </>
+          )}
+          {!sched && !schedLoading && (
+            <div className="empty-state">
+              <div>📅</div>
+              <p>Upload your April 2026 schedule Excel file to view it here</p>
+            </div>
+          )}
+        </>
       )}
 
     </div>

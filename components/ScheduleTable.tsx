@@ -30,7 +30,34 @@ function compareValues(a: any, b: any, dir: SortDir) {
   return dir === 'asc' ? result : -result;
 }
 
-const PAGE_SIZE = 15; // show more rows for a schedule
+const PAGE_SIZE = 15;
+
+// ── Excel time fraction → "H:MM AM/PM" ────────────────
+// Excel stores times as a fraction of 24h: 0.75 = 18:00 = 6:00 PM
+function excelTimeToString(fraction: number): string {
+  const totalMins = Math.round(fraction * 24 * 60);
+  const h = Math.floor(totalMins / 60) % 24;
+  const m = totalMins % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+// Detect time-like columns by name
+function isTimeCol(col: string) {
+  return /time/i.test(col);
+}
+
+// Format a single cell value for display
+function formatCell(col: string, val: any): string {
+  if (val === null || val === undefined) return '—';
+  const num = typeof val === 'number' ? val : null;
+  // Convert decimal fraction to AM/PM if it looks like a time column
+  if (num !== null && num > 0 && num < 1 && isTimeCol(col)) {
+    return excelTimeToString(num);
+  }
+  return String(val);
+}
 
 export default function ScheduleTable({ columns, rows, fileName, uploadedAt, onChangeFile, onClear }: ScheduleTableProps) {
   const [page, setPage] = useState(0);
@@ -42,7 +69,7 @@ export default function ScheduleTable({ columns, rows, fileName, uploadedAt, onC
     if (!search.trim()) return rows;
     const q = search.toLowerCase();
     return rows.filter(row =>
-      columns.some(col => String(row[col] ?? '').toLowerCase().includes(q))
+      columns.some(col => formatCell(col, row[col]).toLowerCase().includes(q))
     );
   }, [rows, columns, search]);
 
@@ -121,7 +148,7 @@ export default function ScheduleTable({ columns, rows, fileName, uploadedAt, onC
                 <tr key={i}>
                   {columns.map(col => (
                     <td key={col}>
-                      {row[col] === null || row[col] === undefined ? '—' : String(row[col])}
+                      {formatCell(col, row[col])}
                     </td>
                   ))}
                 </tr>

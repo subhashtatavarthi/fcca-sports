@@ -3,8 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build"
+    "build": "next build",
+    "add-schedule": "node scripts/add-schedule.js"
   },
+
   "dependencies": {
     "framer-motion": "^11.0.0",
     "lucide-react": "^0.378.0",

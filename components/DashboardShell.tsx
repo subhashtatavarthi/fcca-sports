@@ -20,9 +20,10 @@ type ActiveTab = 'dashboard' | 'schedule';
 
 // ── Constants ──────────────────────────────────────────
 const LS_KEY_PERF    = 'fcca_dashboard_data';
-const LS_KEY_SCHED   = 'fcca_schedule_history_v1'; // stores ScheduleEntry[]
+const LS_KEY_SCHED   = 'fcca_schedule_history_v1';
 const PUBLIC_PERF_URL  = '/fcca-sports/data.xlsx';
-const PUBLIC_SCHED_URL = '/fcca-sports/schedule.xlsx';
+const SCHED_BASE_URL   = '/fcca-sports/schedules/'; // base URL for public/schedules/
+
 
 // ── Helpers ────────────────────────────────────────────
 const ICONS: Record<string, string> = {
@@ -181,36 +182,57 @@ export default function DashboardShell() {
       setPerfLoading(false);
     })();
 
-    // Schedule history from localStorage
+    // Schedule history: merge public manifest (shared) + localStorage (personal uploads)
     (async () => {
+      const localEntries: ScheduleEntry[] = [];
+      const publicEntries: ScheduleEntry[] = [];
+
+      // 1. Load localStorage personal uploads
       try {
         const raw = localStorage.getItem(LS_KEY_SCHED);
         if (raw) {
           const hist: ScheduleEntry[] = JSON.parse(raw);
-          if (hist.length) {
-            setSchedHistory(hist);
-            setActiveSchedId(hist[0].id); // most recent first
-          }
-        } else {
-          // Try public schedule file as first seed entry
-          try {
-            const res = await fetch(PUBLIC_SCHED_URL, { cache:'no-store' });
-            if (res.ok) {
-              const wb = XLSX.read(new Uint8Array(await res.arrayBuffer()), { type:'array' });
-              const ws = wb.Sheets[wb.SheetNames[0]];
-              const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string,any>[];
-              if (rows.length) {
-                const cols = Object.keys(rows[0]);
-                const entry: ScheduleEntry = { id: 'public', fileName: 'FCCA Schedule (Shared)', uploadedAt: 'Shared file', columns: cols, rows };
-                setSchedHistory([entry]);
-                setActiveSchedId('public');
-              }
-            }
-          } catch {}
+          localEntries.push(...hist);
         }
       } catch {}
+
+      // 2. Load public manifest (visible to everyone who visits the live URL)
+      try {
+        const res = await fetch(`${SCHED_BASE_URL}manifest.json`, { cache: 'no-store' });
+        if (res.ok) {
+          const manifest: { schedules: { id: string; file: string; label: string; addedAt: string }[] } = await res.json();
+          for (const item of manifest.schedules) {
+            try {
+              const fileRes = await fetch(`${SCHED_BASE_URL}${item.file}`, { cache: 'no-store' });
+              if (!fileRes.ok) continue;
+              const wb = XLSX.read(new Uint8Array(await fileRes.arrayBuffer()), { type: 'array' });
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string, any>[];
+              if (!rows.length) continue;
+              publicEntries.push({
+                id: `pub_${item.id}`,
+                fileName: item.label,
+                uploadedAt: `📅 Shared · ${item.addedAt}`,
+                columns: Object.keys(rows[0]),
+                rows,
+              });
+            } catch {}
+          }
+        }
+      } catch {}
+
+      // Merge: public entries (shared) + local entries (personal, marked)
+      const merged = [
+        ...publicEntries,
+        ...localEntries.map(e => ({ ...e, fileName: `🖥️ ${e.fileName}` })),
+      ];
+      if (merged.length) {
+        setSchedHistory(merged);
+        setActiveSchedId(merged[0].id);
+      }
     })();
   }, []);
+
 
 
   // ── File handlers ──────────────────────────────────

@@ -23,7 +23,7 @@ type ActiveTab = 'dashboard' | 'schedule';
 const LS_KEY_PERF    = 'fcca_dashboard_data';
 const LS_KEY_SCHED   = 'fcca_schedule_history_v1';
 const PUBLIC_PERF_URL  = '/fcca-sports/data.xlsx';
-const SCHED_BASE_URL   = '/fcca-sports/schedules/'; // base URL for public/schedules/
+const SCHED_BASE_URL   = '/fcca-sports/Schedules/'; // auto-populated by GitHub Actions from Schedules/ folder
 
 
 // ── Helpers ────────────────────────────────────────────

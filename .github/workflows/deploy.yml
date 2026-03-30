@@ -21,11 +21,41 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Auto-generate Schedules/manifest.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const dir = 'Schedules';
+          if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+          const exts = ['.xlsx', '.xls', '.csv'];
+          const files = fs.readdirSync(dir)
+            .filter(f => exts.includes(path.extname(f).toLowerCase()) && !f.startsWith('.'))
+            .sort();
+          const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+          const schedules = files.map((f, i) => ({
+            id: String(Date.now() + i),
+            file: f,
+            label: path.basename(f, path.extname(f)).replace(/[_-]/g, ' '),
+            addedAt: today
+          }));
+          const manifest = { schedules, generatedAt: new Date().toISOString() };
+          fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+          console.log('Generated manifest with', schedules.length, 'schedule(s):', files.join(', '));
+          "
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
       - name: Build static export
         run: npm run build
+
+      - name: Copy Schedules/ into static output
+        run: |
+          mkdir -p out/Schedules
+          cp -r Schedules/. out/Schedules/
+          echo "Copied Schedules/ to out/Schedules/ — contents:"
+          ls -la out/Schedules/
 
       - name: Add .nojekyll
         run: touch out/.nojekyll

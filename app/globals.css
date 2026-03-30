@@ -566,3 +566,135 @@ tbody td { padding: 9px 14px; border-bottom: 1px solid rgba(14,165,233,0.1); col
   transition: color 0.15s, background 0.15s;
 }
 .hist-delete:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+
+/* ── Schedule hero row ── */
+.sched-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── Gear / Token status button ── */
+.token-gear-btn {
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.token-gear-active {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white;
+}
+.token-gear-warn {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: white;
+}
+.token-gear-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+/* ── Status banner ── */
+.sched-status-banner {
+  background: linear-gradient(135deg, rgba(14,165,233,0.15), rgba(3,105,161,0.1));
+  border: 1.5px solid rgba(14,165,233,0.4);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0c4a6e;
+  text-align: center;
+}
+
+/* ── Token modal overlay ── */
+.token-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.token-modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 32px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.token-modal h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0c4a6e;
+  margin: 0;
+}
+.token-desc { font-size: 0.85rem; color: #475569; line-height: 1.5; margin: 0; }
+.token-steps {
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.7;
+  padding-left: 18px;
+  margin: 0;
+}
+.token-steps a { color: #0369a1; text-decoration: underline; }
+.token-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.token-input {
+  flex: 1;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.token-input:focus { border-color: #0ea5e9; }
+.token-status-set {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.token-remove-btn {
+  background: #fee2e2;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #dc2626;
+  cursor: pointer;
+}
+.token-close {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #475569;
+  align-self: flex-end;
+}
+.token-close:hover { background: #e2e8f0; }

@@ -5,6 +5,7 @@ import KpiCard from './KpiCard';
 import DataTable from './DataTable';
 import ChartPanel from './ChartPanel';
 import { ScheduleHistory, ScheduleView, ScheduleEntry } from './ScheduleTable';
+import { getStoredToken, setStoredToken, clearStoredToken, commitSchedule } from '../lib/githubApi';
 
 // ── Types ──────────────────────────────────────────────
 interface ParsedData {
@@ -159,10 +160,19 @@ export default function DashboardShell() {
   const [activeSchedId, setActiveSchedId] = useState<string|null>(null);
   const [schedLoading, setSchedLoading] = useState(false);
   const [schedError, setSchedError] = useState('');
+  const [schedStatus, setSchedStatus] = useState(''); // progress message
   const schedInput = useRef<HTMLInputElement>(null);
+
+  // GitHub token settings
+  const [ghToken, setGhToken] = useState('');
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
 
   // Derived: currently selected entry
   const activeSched = schedHistory.find(e => e.id === activeSchedId) ?? null;
+
+  // Load GitHub token from localStorage on mount
+  useEffect(() => { setGhToken(getStoredToken()); }, []);
 
   // ── Auto-load on mount ─────────────────────────────
   useEffect(() => {
@@ -205,15 +215,25 @@ export default function DashboardShell() {
             try {
               const fileRes = await fetch(`${SCHED_BASE_URL}${item.file}`, { cache: 'no-store' });
               if (!fileRes.ok) continue;
-              const wb = XLSX.read(new Uint8Array(await fileRes.arrayBuffer()), { type: 'array' });
-              const ws = wb.Sheets[wb.SheetNames[0]];
-              const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string, any>[];
+              let rows: Record<string, any>[] = [];
+              let cols: string[] = [];
+              if (item.file.endsWith('.json')) {
+                // Committed via GitHub API (JSON format)
+                const data: { columns: string[]; rows: Record<string,any>[] } = await fileRes.json();
+                rows = data.rows; cols = data.columns;
+              } else {
+                // Legacy Excel file committed via npm script
+                const wb = XLSX.read(new Uint8Array(await fileRes.arrayBuffer()), { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string,any>[];
+                if (rows.length) cols = Object.keys(rows[0]);
+              }
               if (!rows.length) continue;
               publicEntries.push({
                 id: `pub_${item.id}`,
                 fileName: item.label,
-                uploadedAt: `📅 Shared · ${item.addedAt}`,
-                columns: Object.keys(rows[0]),
+                uploadedAt: `🌐 Shared · ${item.addedAt}`,
+                columns: cols,
                 rows,
               });
             } catch {}
@@ -248,7 +268,7 @@ export default function DashboardShell() {
 
   const handleSchedFiles = useCallback(async (files: FileList) => {
     if (!files[0]) return;
-    setSchedLoading(true); setSchedError('');
+    setSchedLoading(true); setSchedError(''); setSchedStatus('Parsing file…');
     try {
       const buf = await files[0].arrayBuffer();
       const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
@@ -256,21 +276,57 @@ export default function DashboardShell() {
       const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false }) as Record<string,any>[];
       if (!rows.length) throw new Error('No data found in file');
       const cols = Object.keys(rows[0]);
-      const entry: ScheduleEntry = {
-        id: Date.now().toString(),
-        fileName: files[0].name,
-        uploadedAt: new Date().toLocaleString(),
-        columns: cols,
-        rows,
-      };
-      // Prepend new entry (most recent first)
-      setSchedHistory(prev => {
-        const updated = [entry, ...prev];
-        try { localStorage.setItem(LS_KEY_SCHED, JSON.stringify(updated)); } catch {}
-        return updated;
-      });
-      setActiveSchedId(entry.id);
-    } catch (e: any) { setSchedError(e.message ?? 'Failed to parse file.'); }
+      const token = getStoredToken();
+
+      if (token) {
+        // ── GitHub API commit: makes file visible to ALL visitors ──
+        setSchedStatus('Committing to GitHub… (everyone will see this in ~2 min)');
+        const slug = files[0].name.replace(/\s+/g, '_').replace(/\.[^.]+$/, '');
+        const label = files[0].name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+        await commitSchedule(token, slug, label, rows, cols);
+        setSchedStatus('✅ Committed! Reloading shared schedules…');
+        // Reload public entries to pick up newly committed file
+        const res = await fetch(`${SCHED_BASE_URL}manifest.json`, { cache: 'no-store' });
+        if (res.ok) {
+          const manifest: { schedules: { id: string; file: string; label: string; addedAt: string }[] } = await res.json();
+          const publicEntries: ScheduleEntry[] = [];
+          for (const item of manifest.schedules) {
+            try {
+              const fileRes = await fetch(`${SCHED_BASE_URL}${item.file}`, { cache: 'no-store' });
+              if (!fileRes.ok) continue;
+              let entryRows: Record<string, any>[] = [];
+              let entryCols: string[] = [];
+              if (item.file.endsWith('.json')) {
+                const data: { columns: string[]; rows: Record<string,any>[] } = await fileRes.json();
+                entryRows = data.rows; entryCols = data.columns;
+              } else {
+                const wbE = XLSX.read(new Uint8Array(await fileRes.arrayBuffer()), { type: 'array' });
+                const wsE = wbE.Sheets[wbE.SheetNames[0]];
+                entryRows = XLSX.utils.sheet_to_json(wsE, { defval: null, raw: false }) as Record<string,any>[];
+                if (entryRows.length) entryCols = Object.keys(entryRows[0]);
+              }
+              if (!entryRows.length) continue;
+              publicEntries.push({ id: `pub_${item.id}`, fileName: item.label, uploadedAt: `🌐 Shared · ${item.addedAt}`, columns: entryCols, rows: entryRows });
+            } catch {}
+          }
+          if (publicEntries.length) { setSchedHistory(publicEntries); setActiveSchedId(publicEntries[0].id); }
+        }
+        setSchedStatus('');
+      } else {
+        // ── No token: show in this browser only + prompt for token ──
+        const id = Date.now().toString();
+        const entry: ScheduleEntry = {
+          id,
+          fileName: `🖥️ ${files[0].name} (your browser only)`,
+          uploadedAt: new Date().toLocaleString(),
+          columns: cols,
+          rows,
+        };
+        setSchedHistory(prev => { const u = [entry, ...prev]; try { localStorage.setItem(LS_KEY_SCHED, JSON.stringify(u)); } catch {} return u; });
+        setActiveSchedId(id);
+        setSchedError('⚠️ No GitHub token set — only YOU can see this upload. Click ⚙️ Settings to add your token so uploads are shared with everyone.');
+      }
+    } catch (e: any) { setSchedError(e.message ?? 'Failed to process file.'); setSchedStatus(''); }
     finally { setSchedLoading(false); }
   }, []);
 
@@ -286,6 +342,15 @@ export default function DashboardShell() {
       return remaining.length ? remaining[0].id : null;
     });
   }, [schedHistory]);
+
+  const saveToken = () => {
+    setStoredToken(tokenInput);
+    setGhToken(tokenInput.trim());
+    setTokenInput('');
+    setShowTokenModal(false);
+    setSchedError('');
+  };
+  const removeToken = () => { clearStoredToken(); setGhToken(''); setShowTokenModal(false); };
 
 
   const kpis = perf ? buildKpis(perf) : [];
@@ -400,11 +465,64 @@ export default function DashboardShell() {
       ══════════════════════════════════════════════ */}
       {tab === 'schedule' && (
         <>
+          {/* Token Settings Modal */}
+          {showTokenModal && (
+            <div className="token-overlay" onClick={() => setShowTokenModal(false)}>
+              <div className="token-modal" onClick={e => e.stopPropagation()}>
+                <h3>⚙️ GitHub Token Settings</h3>
+                <p className="token-desc">
+                  A GitHub <strong>Personal Access Token</strong> (PAT) lets uploads go directly to the repository
+                  so <strong>everyone who visits the URL sees them</strong> — not just your browser.
+                </p>
+                <ol className="token-steps">
+                  <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer">github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens</a></li>
+                  <li>Set Repository access → <strong>fcca-sports</strong></li>
+                  <li>Permissions → Contents: <strong>Read and Write</strong></li>
+                  <li>Generate token → copy and paste below</li>
+                </ol>
+                {ghToken ? (
+                  <div className="token-status-set">
+                    ✅ Token is set — uploads go to GitHub for everyone
+                    <button className="token-remove-btn" onClick={removeToken}>Remove Token</button>
+                  </div>
+                ) : (
+                  <div className="token-input-row">
+                    <input
+                      className="token-input"
+                      type="password"
+                      placeholder="github_pat_xxxxxxxxxxxx…"
+                      value={tokenInput}
+                      onChange={e => setTokenInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveToken()}
+                    />
+                    <button className="hist-upload-btn" onClick={saveToken} disabled={!tokenInput.trim()}>Save</button>
+                  </div>
+                )}
+                <button className="token-close" onClick={() => setShowTokenModal(false)}>✕ Close</button>
+              </div>
+            </div>
+          )}
+
           <div className="sched-hero">
-            <h2>📅 Planning Schedule History</h2>
-            <p>{schedHistory.length ? `${schedHistory.length} schedule${schedHistory.length>1?'s':''} saved · click any entry to view` : 'Upload schedule files — they are all preserved in history'}</p>
+            <div className="sched-hero-row">
+              <div>
+                <h2>📅 Planning Schedule History</h2>
+                <p>{schedHistory.length ? `${schedHistory.filter(e=>e.id.startsWith('pub_')).length} shared + ${schedHistory.filter(e=>!e.id.startsWith('pub_')).length} local · click any entry to view` : 'Upload schedule files — they are all preserved in history'}</p>
+              </div>
+              <button
+                className={`token-gear-btn ${ghToken ? 'token-gear-active' : 'token-gear-warn'}`}
+                onClick={() => setShowTokenModal(true)}
+                title={ghToken ? 'GitHub token set — uploads shared with everyone' : 'No token — uploads only visible to you'}
+              >
+                ⚙️ {ghToken ? '🟢 Sharing enabled' : '🟡 Browser only — click to enable sharing'}
+              </button>
+            </div>
           </div>
-          {schedError && <div className="error-banner">❌ {schedError}</div>}
+
+          {schedStatus && (
+            <div className="sched-status-banner">{schedStatus}</div>
+          )}
+          {schedError && <div className="error-banner">{schedError}</div>}
 
           {/* Hidden file input */}
           <input ref={schedInput} type="file" accept=".xlsx,.xls,.csv"
@@ -422,7 +540,7 @@ export default function DashboardShell() {
             />
             <div className="sched-main">
               {schedLoading && (
-                <div className="empty-state"><div>⏳</div><p>Parsing file…</p></div>
+                <div className="empty-state"><div>⏳</div><p>{schedStatus || 'Processing…'}</p></div>
               )}
               {!schedLoading && !activeSched && (
                 <div className="empty-state">
@@ -438,6 +556,8 @@ export default function DashboardShell() {
           </div>
         </>
       )}
+
+
 
     </div>
   );
